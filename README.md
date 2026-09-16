@@ -8,7 +8,7 @@ What I'm trying to get good at is **measurement**: benchmarks that report where 
 fast structure *loses*, evaluations that separate what was proven from what was
 assumed, and claims scoped to the evidence behind them.
 
-**Languages** &nbsp;C++ · Python
+**Languages** &nbsp;C++ · Python<br>
 **Focus** &nbsp;Data structures & algorithms · Applied ML / computer vision · LLM-agent security
 
 [LinkedIn](https://www.linkedin.com/in/adivishal) · [Email](mailto:adi.vishal.21052006@gmail.com)
