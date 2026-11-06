@@ -1,47 +1,152 @@
-## Adi Vishal
+# Adi Vishal
 
-CS undergraduate at VIT Pune. I write systems-flavoured code, hand-built data
-structures in C++, computer-vision pipelines in Python and care more about the
-engineering around a model than the model itself.
+Computer science undergraduate at VIT Pune. I build systems and backend software, and I spend
+as much effort checking it as writing it: fault injection and linearizability checks for
+distributed code, brute-force oracles for data structures, mutation testing for the tests
+themselves. Each project below says what was measured and what was not.
 
-What I'm trying to get good at is **measurement**: benchmarks that report where a
-fast structure *loses*, evaluations that separate what was proven from what was
-assumed, and claims scoped to the evidence behind them.
-
-**Languages** &nbsp;C++ · Python<br>
-**Focus** &nbsp;Data structures & algorithms · Applied ML / computer vision · LLM-agent security
+**Interests:** systems and backend engineering · distributed systems and databases ·
+algorithms, data structures and performance · security engineering for AI systems · applied
+ML and computer vision
 
 [LinkedIn](https://www.linkedin.com/in/adivishal) · [Email](mailto:adi.vishal.21052006@gmail.com)
 
----
+## Projects at a glance
 
-### Projects
+| Project | Area | One thing you can check |
+|---|---|---|
+| [Quorum](https://github.com/adivishall/quorum) · Go | Distributed systems, databases | Raft and an LSM engine with no third-party dependencies; 373 mutants killed in CI |
+| [SafeTrail](https://github.com/adivishall/safetrail) · C++17 | Data structures, performance | 277,200 differential queries against a brute-force oracle, 0 mismatches |
+| [Sentinel](https://github.com/adivishall/sentinel) · Python | Security for AI agents | Seeded red team, 5,749 queries: detector evaded on 8–10% of attacks; no unauthorised action, by construction (simulated agent) |
+| [FPL Copilot](https://github.com/adivishall/fpl-copilot) · Python, TypeScript | Forecasting, optimization, full stack | 114-gameweek walk-forward backtest, 0 look-ahead violations |
+| [Two-Wheeler Safety](https://github.com/adivishall/two-wheeler-safety) · Python | Computer vision | Detector mAP@50 0.727 on a held-out test split |
 
-**[Sentinel](https://github.com/adivishall/sentinel)** &nbsp;·&nbsp; Python
+## Projects
 
-An AI firewall for LLM agents that make irreversible decisions. The verdict is a
-pure function of verified ledger facts, never attacker-controlled prose the trust
-boundary is a type (`UntrustedText` vs `TrustedFacts`) checked by mypy. Evaluated
-offline against a simulated agent; the README says so up front.
+### [Quorum](https://github.com/adivishall/quorum): distributed key-value store · Go
 
-**[SafeTrail](https://github.com/adivishall/safetrail)** &nbsp;·&nbsp; C++17, no dependencies
+A replicated key-value store in which every acknowledged write must survive crashes,
+partitions and membership changes. Its `go.mod` has no dependencies: the consensus, storage
+and transport are all its own.
 
-A geofencing engine with every spatial index written by hand instead of delegated
-to PostGIS, quadtree, R-tree, AVL interval tree, a persistent path-copying
-quadtree, rollback union-find. All validated against a brute-force oracle (0
-mismatches across 18,000 queries), with a benchmark that reports its own crossover
-points.
+- **Built:** Raft from scratch (elections, ReadIndex reads, joint-consensus membership,
+  snapshots), one Raft group per shard over its own TCP transport, client sessions so a
+  retried write executes at most once, and an LSM storage engine (WAL, SSTables, compaction,
+  MANIFEST).
+- **Evidence:** every pull request runs 373 mutants (CI fails if one survives), 35 fuzz
+  targets, 200-seed deterministic fault schedules and 89 real-process tests. A linearizability
+  checker, validated against an independent oracle on 20,000 random histories, checks client
+  histories recorded from real processes under `SIGKILL`, `SIGSTOP` and partitions. Tested,
+  not formally proven.
+- **Status:** the LSM engine can hold each group's state behind `dkvd -state-machine lsm`
+  (opt-in; the in-memory state machine is the default). Three of six integration stages are
+  merged. The fourth, engine-checkpoint snapshots, is an
+  [open PR](https://github.com/adivishall/quorum/pull/27), and the deterministic simulator
+  still runs only the in-memory state machine.
+- **Try it:** no hosted demo. `go run ./cmd/dkvlab -scenario chaos -seed 1 -runs 1` starts
+  real nodes, injects seeded faults and checks the history for linearizability in about 30
+  seconds.
 
-**[Two-Wheeler Safety](https://github.com/adivishall/two-wheeler-safety)** &nbsp;·&nbsp; Python, YOLOv8, Flask
+[README](https://github.com/adivishall/quorum#readme) ·
+[How linearizability is checked](https://github.com/adivishall/quorum/blob/main/docs/LINEARIZABILITY.md) ·
+[Limitations](https://github.com/adivishall/quorum/blob/main/docs/LIMITATIONS.md)
 
-Traffic-violation detection where the hard part is everything after the detector:
-Hungarian plate-to-rider assignment, crossframe OCR voting, temporal violation
-confirmation. Detector baseline mAP@50 0.697; system-level numbers are synthetic
-and demonstrate the pipeline is correct, not that it's accurate in the field.
+### [SafeTrail](https://github.com/adivishall/safetrail): geofencing engine · C++17
 
----
+Decides, GPS fix after fix, whether each person is inside, outside or uncertain relative to
+every hazard zone near them, and emits an event only when that changes.
 
-### Currently
+- **Built:** a quadtree, an STR-packed R-tree, an AVL interval tree ("which rules are in force
+  at *t*?") and a persistent path-copying quadtree ("what were the rules at 14:32?"),
+  hand-written with no dependencies beyond a C++17 compiler. Around the engine, an operations
+  platform: an HTTP server and web console for consent-based multi-user tracking, alerts
+  correlated into incidents, and responder dispatch over the OpenStreetMap road graph.
+- **Evidence:** 277,200 randomized differential queries on hostile workloads, across five index
+  configurations, match the brute-force oracle with zero mismatches. Mutation testing catches 28
+  of 28 injected bugs (23 in the engine, 5 in the platform), and ASan/UBSan run in CI. The process found ten real defects in code that
+  was already passing its tests.
+- **Performance:** at 100,000 synthetic zones in one district, the R-tree answers range queries
+  roughly 100–230× faster than a linear scan on one laptop. The ratio moves between sessions, so
+  the range is published rather than the best run.
+- **Try it:** a [static replay](https://adivishall.github.io/safetrail/) generated by the
+  engine, with no sign-in: simulated tourists moving through real OpenStreetMap zones plus
+  synthetic ones. The [integrated application](https://safetrail-v0bh.onrender.com) is hosted
+  too, but sign-in needs an account issued by me, everyone in it is simulated, and the free
+  host sleeps when idle, so the first visit waits while it starts. `make app` runs it locally,
+  and `make review` runs the engine's whole story in about a minute.
 
-Working through algorithms seriously, and looking for the thing I keep missing:
-code review from engineers who didn't write the code.
+[README](https://github.com/adivishall/safetrail#readme) ·
+[Results and method](https://github.com/adivishall/safetrail/blob/main/docs/RESULTS.md) ·
+[Defect log](https://github.com/adivishall/safetrail/blob/main/docs/DEFECT_LOG.md)
+
+### [Sentinel](https://github.com/adivishall/sentinel): decision security for AI agents in finance · Python
+
+Keeps an AI agent from auto-executing a refund, payment or onboarding action that the
+institution's own records do not support, whether the agent was persuaded by an injected
+instruction or by a customer's lie.
+
+- **Built:** the model only recommends. The decision is computed from a view with no field for
+  attacker text or model output: trusted records, signed fail-closed policy, a capability
+  registry and authenticated human review. Decisions go into a SHA-256 audit chain with
+  Ed25519-signed checkpoints, can be replayed deterministically, and a candidate policy can be
+  backtested against recorded history.
+- **Evidence:** a seeded black-box attacker sent 5,749 queries. It got past the text detector
+  on 8–10% of the attacks the detector had caught, and none of its attempts executed an action:
+  the amount, ledger and permissions come from signed facts the text cannot change, so that
+  zero holds by construction rather than as a measured rate. 1,041 tests.
+- **Limits:** evaluated offline on synthetic corpora against a simulated agent. No live-model
+  evaluation has been run.
+- **Try it:** [console snapshot](https://adivishall.github.io/sentinel/) to browse precomputed
+  decisions and run the preset attacks. Custom attacks and replay need the local API
+  (`make api`).
+
+[README](https://github.com/adivishall/sentinel#readme) ·
+[Security model](https://github.com/adivishall/sentinel/blob/main/docs/SECURITY_MODEL.md) ·
+[Evaluation](https://github.com/adivishall/sentinel/blob/main/docs/EVALUATION.md)
+
+### [FPL Copilot](https://github.com/adivishall/fpl-copilot): decision engine for Fantasy Premier League · Python, TypeScript
+
+Plans a manager's transfers, hits, chips and captaincy across several gameweeks under uncertain
+minutes, injuries and prices, starting from their real squad and the game's budget rules.
+
+- **Built:** Monte Carlo player-points forecasts feed a multi-gameweek mixed-integer planner
+  (HiGHS), every plan is compared with doing nothing, and an independent validator replays it
+  through the rules. FastAPI, PostgreSQL, Redis/RQ workers, Next.js.
+- **Evidence:** a walk-forward backtest over 114 past gameweeks (three seasons) with zero
+  look-ahead violations. Those seasons also shaped the design, so they are not a held-out test;
+  forecasts for the current season are recorded before each deadline and scored afterwards.
+- **Status:** runs locally with Docker Compose. No public demo.
+
+### [Two-Wheeler Safety](https://github.com/adivishall/two-wheeler-safety): traffic-violation review prototype · Python
+
+Turns a detector's raw boxes into violations, such as riding without a helmet or three on one
+bike, that a human reviewer can check: the right plate attached to the right rider, confirmed over several frames.
+
+- **Built:** YOLOv8n detection, Hungarian plate-to-rider association, cross-frame OCR voting and
+  temporal confirmation, feeding a Flask review dashboard.
+- **Evidence:** detector mAP@50 is 0.727 on a de-leaked held-out test split (175 images).
+  Everything after the detector is evaluated only on synthetic scenarios.
+- **Status:** a prototype review assistant, not an enforcement system. `make demo` runs the
+  dashboard on synthetic data without model weights.
+
+## Tools
+
+**Used in the projects above**
+
+- **Languages:** Go, C++17, Python
+- **Systems and backend:** Raft consensus, LSM storage (WAL, SSTables, compaction, MANIFEST),
+  binary protocols over TCP, FastAPI, PostgreSQL, Redis/RQ, SQLite, Flask, Docker Compose
+- **ML, vision and optimization:** YOLOv8 (Ultralytics), OpenCV, EasyOCR, Hungarian
+  assignment, Monte Carlo simulation, mixed-integer programming (HiGHS)
+- **Testing and measurement:** deterministic simulation and fault injection, linearizability
+  checking, differential testing against oracles, mutation testing, fuzzing, ASan/UBSan, pytest
+  and Hypothesis, mypy, GitHub Actions
+
+**Used in less depth:** TypeScript, Next.js and React (the FPL Copilot web front end)
+
+## Currently
+
+- Quorum: engine checkpoints and streamed snapshot installation
+  ([#27](https://github.com/adivishall/quorum/pull/27)), the next stage of running the LSM engine
+  under Raft.
+- FPL Copilot: scoring its forecasts against the 2026–27 season as results come in.
